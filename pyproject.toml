@@ -1,0 +1,33 @@
+[project]
+name = "pattern-chain"
+version = "0.1.0"
+description = "Prompt Template Pattern implementation with LangChain"
+authors = [
+    {name = "MieleSantos",email = "mielesnts@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+]
+
+[tool.poetry.scripts]
+prompt-template = "src.main:main"
+
+
+[tool.poetry.dependencies]
+requests = "^2.32.5"
+langchain = "^1.2.10"
+langgraph = "^1.0.8"
+langsmith = "^0.7.3"
+langchain-openai = "^1.1.10"
+langchain-google-genai = "^4.2.0"
+langchain-core = "^1.2.13"
+dotenv = "^0.9.9"
+langchain-google-vertexai = "^3.2.2"
+
+[tool.poetry]
+packages = [{include = "prompt_template", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
