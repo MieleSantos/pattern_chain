@@ -1,3 +1,14 @@
+# Chain Patterns with LangChain
+
+Este repositório contém implementações de padrões de encadeamento (Chain Patterns) utilizando LangChain para aplicações de Inteligência Artificial Generativa.
+
+## Índice
+
+1. [Prompt Template Pattern](#prompt-template-pattern)
+2. [Sequential Chain Pattern](#sequential-chain-pattern)
+
+---
+
 # Prompt Template Pattern
 
 O **Prompt Template Pattern** é um padrão de design utilizado em aplicações de Inteligência Artificial Generativa para criar prompts reutilizáveis e dinâmicos. Ele permite separar a estrutura fixa do prompt das variáveis que serão preenchidas em tempo de execução.
@@ -66,14 +77,19 @@ result = chain.invoke(
 ```
 pattern_chain/
 ├── src/
-│   ├── main.py              # Entry point
-│   └── prompt_template/
-│       ├── __init__.py      # Exports públicos
-│       ├── prompts.py       # Definição de templates
-│       └── chain.py         # Configuração das chains
-├── .env.example             # Variáveis de ambiente
-├── pyproject.toml           # Configuração Poetry
-└── README.md                # Documentação
+│   ├── main.py                  # Entry point - Prompt Template
+│   ├── main_sequential.py       # Entry point - Sequential Chain
+│   ├── prompt_template/         # Prompt Template Pattern
+│   │   ├── __init__.py
+│   │   ├── prompts.py
+│   │   └── chain.py
+│   └── sequential_chain/       # Sequential Chain Pattern
+│       ├── __init__.py
+│       ├── prompts.py
+│       └── chain.py
+├── .env.example
+├── pyproject.toml
+└── README.md
 ```
 
 ## Instalação e Uso
@@ -82,9 +98,79 @@ pattern_chain/
 # Instalar dependências
 poetry install
 
-# Executar
-poetry run prompt-template
-
-# Ou diretamente
+# Executar Prompt Template Pattern
 python src/main.py
+
+# Executar Sequential Chain Pattern
+python src/main_sequential.py
 ```
+
+---
+
+# Sequential Chain Pattern
+
+O **Sequential Chain Pattern** é um padrão onde múltiplas operações são executadas em sequência, onde a saída de cada etapa torna-se a entrada da próxima. Isso permite criar pipelines de processamento complexos.
+
+## Conceito
+
+Em vez de uma única chamada ao modelo, você encadeia múltiplas operações:
+1. A saída da primeira operação alimenta a segunda
+2. Cada etapa pode ter seu próprio prompt e lógica
+3. O resultado final agrega todas as transformações
+
+## Exemplo de Implementação
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+# Prompt para tradução
+translate_prompt = ChatPromptTemplate.from_messages([
+    ("system", "Translate to {target_language}"),
+    ("user", "{text}")
+])
+
+# Prompt para resumo
+summary_prompt = ChatPromptTemplate.from_messages([
+    ("system", "Summarize the following text"),
+    ("user", "{text}")
+])
+
+# Encadeando as operações
+translate_chain = translate_prompt | llm | parser
+summary_chain = summary_prompt | llm | parser
+
+def sequential_chain(input_dict):
+    translated = translate_chain.invoke({
+        "target_language": input_dict["language"],
+        "text": input_dict["text"]
+    })
+    summary = summary_chain.invoke({"text": translated})
+    return {"translated": translated, "summary": summary}
+```
+
+## Estrutura do Projeto - Sequential Chain
+
+```
+src/
+├── main_sequential.py        # Entry point
+└── sequential_chain/
+    ├── __init__.py          # Exports públicos
+    ├── prompts.py           # Definição de templates
+    └── chain.py            # Configuração das chains
+```
+
+## Instalação e Uso
+
+```bash
+# Executar Sequential Chain
+python src/main_sequential.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Pipeline Complexo** | Combine múltiplas operações em uma única execução |
+| **Reutilização** | Cada etapa pode ser reutilizada independentemente |
+| **Debugging** | Possibilidade de inspecionar saída de cada etapa |
+| **Flexibilidade** | Adicione ou remova etapas facilmente |
