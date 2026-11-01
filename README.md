@@ -9,6 +9,7 @@ Este repositório contém implementações de padrões de encadeamento (Chain Pa
 3. [Structured Output Pattern](#structured-output-pattern)
 4. [Router Chain Pattern](#router-chain-pattern)
 5. [Parallel Chain Pattern](#parallel-chain-pattern)
+6. [Few-Shot Prompting Pattern](#few-shot-prompting-pattern)
 
 ---
 
@@ -85,6 +86,7 @@ pattern_chain/
 │   ├── main_structured.py       # Entry point - Structured Output
 │   ├── main_router.py           # Entry point - Router Chain
 │   ├── main_parallel.py         # Entry point - Parallel Chain
+│   ├── main_few_shot.py         # Entry point - Few-Shot Prompting
 │   ├── prompt_template/         # Prompt Template Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
@@ -99,6 +101,11 @@ pattern_chain/
 │   │   └── chain.py
 │   ├── parallel_chain/         # Parallel Chain Pattern
 │   │   ├── __init__.py
+│   │   ├── prompts.py
+│   │   └── chain.py
+│   ├── few_shot/               # Few-Shot Prompting Pattern
+│   │   ├── __init__.py
+│   │   ├── examples.py
 │   │   ├── prompts.py
 │   │   └── chain.py
 │   └── structured_output/      # Structured Output Pattern
@@ -364,4 +371,72 @@ Use `config={"max_concurrency": N}` para limitar quantas chamadas rodam ao mesmo
 | **Composição** | Combina com etapas sequenciais na mesma chain |
 | **Async** | `ainvoke` também executa os ramos em paralelo |
 | **Controle** | `max_concurrency` limita as chamadas simultâneas |
+
+---
+
+# Few-Shot Prompting Pattern
+
+O **Few-Shot Prompting Pattern** coloca exemplos de entrada e saída dentro do prompt para mostrar ao modelo o tom, o tamanho e a estrutura esperados. Funciona melhor que descrever o estilo em regras, porque o modelo imita o que vê.
+
+## Conceito
+
+1. Escreva alguns pares de exemplo (mensagem do cliente e a resposta ideal)
+2. Os exemplos entram no prompt como turnos de conversa (humano → IA)
+3. Com muitos exemplos, um seletor escolhe só os mais parecidos com a mensagem nova
+
+## Exemplo de Implementação
+
+```python
+from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+
+example_prompt = ChatPromptTemplate.from_messages(
+    [("human", "{message}"), ("ai", "{reply}")]
+)
+
+few_shot = FewShotChatMessagePromptTemplate(
+    examples=EXAMPLES,
+    example_prompt=example_prompt,
+)
+
+prompt = ChatPromptTemplate.from_messages(
+    [("system", SYSTEM), few_shot, ("human", "{message}")]
+)
+```
+
+## Seleção dinâmica
+
+```python
+from langchain_core.example_selectors import SemanticSimilarityExampleSelector
+from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+selector = SemanticSimilarityExampleSelector.from_examples(
+    EXAMPLES,
+    GoogleGenerativeAIEmbeddings(model="gemini-embedding-001"),
+    InMemoryVectorStore,
+    k=2,
+    input_keys=["message"],
+)
+
+few_shot = FewShotChatMessagePromptTemplate(
+    example_selector=selector,
+    example_prompt=example_prompt,
+    input_variables=["message"],
+)
+```
+
+## Executando
+
+```bash
+python src/main_few_shot.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Estilo consistente** | O modelo copia tom, tamanho e estrutura dos exemplos |
+| **Menos regras no prompt** | Um exemplo substitui vários parágrafos de instrução |
+| **Contexto enxuto** | A seleção dinâmica envia só os exemplos relevantes (6 mensagens em vez de 14 no exemplo) |
+| **Fácil de evoluir** | Melhorar a resposta é editar um exemplo, não reescrever o prompt |
 
