@@ -11,6 +11,7 @@ Este repositório contém implementações de padrões de encadeamento (Chain Pa
 5. [Parallel Chain Pattern](#parallel-chain-pattern)
 6. [Few-Shot Prompting Pattern](#few-shot-prompting-pattern)
 7. [RAG Pattern](#rag-pattern)
+8. [Memory Pattern](#memory-pattern)
 
 ---
 
@@ -89,6 +90,7 @@ pattern_chain/
 │   ├── main_parallel.py         # Entry point - Parallel Chain
 │   ├── main_few_shot.py         # Entry point - Few-Shot Prompting
 │   ├── main_rag.py              # Entry point - RAG
+│   ├── main_memory.py           # Entry point - Memory
 │   ├── prompt_template/         # Prompt Template Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
@@ -115,6 +117,10 @@ pattern_chain/
 │   │   ├── indexing.py
 │   │   ├── prompts.py
 │   │   └── chain.py
+│   ├── memory/                 # Memory Pattern (LangGraph)
+│   │   ├── __init__.py
+│   │   ├── prompts.py
+│   │   └── graph.py
 │   └── structured_output/      # Structured Output Pattern
 │       ├── __init__.py
 │       ├── schemas.py
@@ -498,4 +504,61 @@ python src/main_rag.py
 | **Menos invenção** | O modelo responde a partir de trechos reais e admite quando não sabe |
 | **Rastreabilidade** | Cada resposta vem com os trechos usados como contexto |
 | **Escala** | Só os trechos relevantes vão para o prompt, não a base inteira |
+
+---
+
+# Memory Pattern
+
+O **Memory Pattern** faz a aplicação lembrar a conversa. A cada mensagem, o histórico daquela conversa volta para o prompt, e o modelo entende perguntas de acompanhamento como "e se eu tiver pago com Pix?".
+
+## Conceito
+
+1. O histórico fica no estado de um grafo do LangGraph (`MessagesState`)
+2. Um checkpointer salva o estado depois de cada execução, separado por `thread_id`
+3. Só as últimas mensagens vão para o prompt (`trim_messages`), mas o histórico completo continua salvo
+4. No RAG, a pergunta de acompanhamento é reescrita como uma pergunta completa antes da busca
+
+> O `RunnableWithMessageHistory` e o `InMemoryChatMessageHistory` estão obsoletos no LangChain 1.x. A recomendação atual é a persistência do LangGraph, usada aqui.
+
+## Exemplo de Implementação
+
+```python
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import START, END, MessagesState, StateGraph
+
+
+def respond(state: MessagesState) -> dict:
+    history, question = state["messages"][:-1], state["messages"][-1].content
+    answer = chain.invoke({"history": trim_history(history), "question": question})
+    return {"messages": [AIMessage(answer)]}
+
+
+graph = StateGraph(MessagesState)
+graph.add_node("respond", respond)
+graph.add_edge(START, "respond")
+graph.add_edge("respond", END)
+app = graph.compile(checkpointer=InMemorySaver())
+
+app.invoke(
+    {"messages": [HumanMessage("E se eu tiver pago com Pix?")]},
+    config={"configurable": {"thread_id": "cliente-1"}},
+)
+```
+
+O RAG conversacional (`create_conversational_rag_graph`) tem três nós: `condense` (reescreve a pergunta), `retrieve` (busca) e `answer` (responde com documentação + histórico).
+
+## Executando
+
+```bash
+python src/main_memory.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Perguntas de acompanhamento** | "E no Pix?" funciona porque o histórico dá o contexto |
+| **Conversas isoladas** | Cada `thread_id` tem o seu histórico |
+| **Custo controlado** | Só as últimas mensagens vão para o prompt |
+| **Pronto para produção** | Troque o `InMemorySaver` por um checkpointer com banco (como Postgres) sem mudar o grafo |
 
