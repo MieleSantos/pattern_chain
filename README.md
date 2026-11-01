@@ -8,6 +8,7 @@ Este repositório contém implementações de padrões de encadeamento (Chain Pa
 2. [Sequential Chain Pattern](#sequential-chain-pattern)
 3. [Structured Output Pattern](#structured-output-pattern)
 4. [Router Chain Pattern](#router-chain-pattern)
+5. [Parallel Chain Pattern](#parallel-chain-pattern)
 
 ---
 
@@ -83,6 +84,7 @@ pattern_chain/
 │   ├── main_sequential.py       # Entry point - Sequential Chain
 │   ├── main_structured.py       # Entry point - Structured Output
 │   ├── main_router.py           # Entry point - Router Chain
+│   ├── main_parallel.py         # Entry point - Parallel Chain
 │   ├── prompt_template/         # Prompt Template Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
@@ -92,6 +94,10 @@ pattern_chain/
 │   │   ├── prompts.py
 │   │   └── chain.py
 │   ├── router_chain/           # Router Chain Pattern
+│   │   ├── __init__.py
+│   │   ├── prompts.py
+│   │   └── chain.py
+│   ├── parallel_chain/         # Parallel Chain Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
 │   │   └── chain.py
@@ -308,4 +314,54 @@ python src/main_router.py
 | **Custo** | Só a rota escolhida é executada |
 | **Regras de negócio** | Casos críticos podem ir para uma rota sem LLM, como o encaminhamento a um atendente |
 | **Evolução** | Uma nova categoria vira uma nova rota, sem mexer nas outras |
+
+---
+
+# Parallel Chain Pattern
+
+O **Parallel Chain Pattern** executa ao mesmo tempo etapas que não dependem umas das outras. Todas recebem a mesma entrada, e o resultado é um dicionário com a saída de cada uma.
+
+## Conceito
+
+1. Identifique as etapas que só dependem da mesma entrada
+2. Agrupe essas etapas num `RunnableParallel` (ou num dict dentro da chain)
+3. O tempo total passa a ser o da etapa mais lenta, não a soma de todas
+
+## Exemplo de Implementação
+
+```python
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
+
+analyses = RunnableParallel(
+    summary=create_summary_prompt() | llm | parser,
+    sentiment=create_sentiment_prompt() | llm | parser,
+    keywords=create_keywords_prompt() | llm | parser,
+)
+
+chain = (
+    RunnablePassthrough.assign(translated=translate)
+    | RunnablePassthrough.assign(
+        analysis={"text": itemgetter("translated")} | analyses
+    )
+)
+```
+
+A tradução continua sequencial, porque as análises dependem dela. Depois disso, resumo, sentimento e palavras-chave rodam juntos.
+
+## Executando
+
+```bash
+python src/main_parallel.py
+```
+
+Use `config={"max_concurrency": N}` para limitar quantas chamadas rodam ao mesmo tempo, por exemplo para respeitar o rate limit do provedor.
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Latência** | Com um modelo falso de 0,5 s por chamada: 2,0 s em sequência, 1,0 s com as análises em paralelo |
+| **Composição** | Combina com etapas sequenciais na mesma chain |
+| **Async** | `ainvoke` também executa os ramos em paralelo |
+| **Controle** | `max_concurrency` limita as chamadas simultâneas |
 
