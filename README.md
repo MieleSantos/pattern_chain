@@ -10,6 +10,7 @@ Este repositório contém implementações de padrões de encadeamento (Chain Pa
 4. [Router Chain Pattern](#router-chain-pattern)
 5. [Parallel Chain Pattern](#parallel-chain-pattern)
 6. [Few-Shot Prompting Pattern](#few-shot-prompting-pattern)
+7. [RAG Pattern](#rag-pattern)
 
 ---
 
@@ -87,6 +88,7 @@ pattern_chain/
 │   ├── main_router.py           # Entry point - Router Chain
 │   ├── main_parallel.py         # Entry point - Parallel Chain
 │   ├── main_few_shot.py         # Entry point - Few-Shot Prompting
+│   ├── main_rag.py              # Entry point - RAG
 │   ├── prompt_template/         # Prompt Template Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
@@ -108,11 +110,18 @@ pattern_chain/
 │   │   ├── examples.py
 │   │   ├── prompts.py
 │   │   └── chain.py
+│   ├── rag/                    # RAG Pattern
+│   │   ├── __init__.py
+│   │   ├── indexing.py
+│   │   ├── prompts.py
+│   │   └── chain.py
 │   └── structured_output/      # Structured Output Pattern
 │       ├── __init__.py
 │       ├── schemas.py
 │       ├── prompts.py
 │       └── chain.py
+├── data/
+│   └── nuvem/                  # Base de conhecimento usada no RAG
 ├── .env.example
 ├── pyproject.toml
 └── README.md
@@ -439,4 +448,54 @@ python src/main_few_shot.py
 | **Menos regras no prompt** | Um exemplo substitui vários parágrafos de instrução |
 | **Contexto enxuto** | A seleção dinâmica envia só os exemplos relevantes (6 mensagens em vez de 14 no exemplo) |
 | **Fácil de evoluir** | Melhorar a resposta é editar um exemplo, não reescrever o prompt |
+
+---
+
+# RAG Pattern
+
+O **RAG (Retrieval-Augmented Generation)** busca os trechos relevantes de uma base de documentos e coloca esses trechos no prompt. O modelo responde com base no que foi encontrado, e não no que "lembra" do treinamento.
+
+## Conceito
+
+**Indexação** (uma vez, ou quando os documentos mudam):
+1. Carregar os documentos (`data/nuvem/*.md`)
+2. Dividir em trechos, primeiro por cabeçalho e depois por tamanho
+3. Gerar embeddings e guardar numa base vetorial
+
+**Consulta** (a cada pergunta):
+1. Buscar os `k` trechos mais parecidos com a pergunta
+2. Montar o prompt com esses trechos como contexto
+3. Gerar a resposta, citando as fontes
+
+## Exemplo de Implementação
+
+```python
+retriever = create_retriever(k=3)  # carrega, divide, indexa
+
+chain = (
+    RunnablePassthrough.assign(docs=itemgetter("question") | retriever)
+    | RunnablePassthrough.assign(answer=to_prompt_input | prompt | llm | parser)
+)
+
+result = chain.invoke({"question": "Em quanto tempo recebo o estorno?"})
+result["answer"]   # resposta baseada em cobranca.md
+result["sources"]  # ["cobranca.md > Cobrança em duplicidade", ...]
+```
+
+O prompt instrui o modelo a usar só a documentação e a responder "Não encontrei essa informação na documentação." quando a resposta não estiver lá.
+
+## Executando
+
+```bash
+python src/main_rag.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Respostas atualizadas** | Mudou a política? Atualize o documento, não o prompt nem o modelo |
+| **Menos invenção** | O modelo responde a partir de trechos reais e admite quando não sabe |
+| **Rastreabilidade** | Cada resposta vem com os trechos usados como contexto |
+| **Escala** | Só os trechos relevantes vão para o prompt, não a base inteira |
 
