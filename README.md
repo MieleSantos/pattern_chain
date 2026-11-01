@@ -7,6 +7,7 @@ Este repositório contém implementações de padrões de encadeamento (Chain Pa
 1. [Prompt Template Pattern](#prompt-template-pattern)
 2. [Sequential Chain Pattern](#sequential-chain-pattern)
 3. [Structured Output Pattern](#structured-output-pattern)
+4. [Router Chain Pattern](#router-chain-pattern)
 
 ---
 
@@ -81,11 +82,16 @@ pattern_chain/
 │   ├── main.py                  # Entry point - Prompt Template
 │   ├── main_sequential.py       # Entry point - Sequential Chain
 │   ├── main_structured.py       # Entry point - Structured Output
+│   ├── main_router.py           # Entry point - Router Chain
 │   ├── prompt_template/         # Prompt Template Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
 │   │   └── chain.py
 │   ├── sequential_chain/       # Sequential Chain Pattern
+│   │   ├── __init__.py
+│   │   ├── prompts.py
+│   │   └── chain.py
+│   ├── router_chain/           # Router Chain Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
 │   │   └── chain.py
@@ -252,4 +258,54 @@ python src/main_structured.py
 | **Validação** | Tipos e valores permitidos são verificados pelo Pydantic |
 | **Integração** | O objeto vai direto para regras de negócio, banco de dados ou resposta de API |
 | **Base para roteamento** | Campos como `category` permitem decidir o próximo passo do fluxo |
+
+---
+
+# Router Chain Pattern
+
+O **Router Chain Pattern** classifica a entrada e manda cada pedido para a chain especializada naquele assunto. Em vez de um prompt genérico que tenta responder tudo, cada rota tem o seu próprio prompt.
+
+## Conceito
+
+1. Uma etapa de classificação decide o tipo do pedido (aqui, o `TicketAnalysis` do Structured Output)
+2. Uma função de roteamento escolhe qual chain executar
+3. A chain escolhida responde, e as outras não são executadas
+
+## Exemplo de Implementação
+
+```python
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+
+routes = create_routes(llm)  # {"billing": ..., "technical": ..., ...}
+
+
+def route(state):
+    ticket = state["ticket"]
+    if ticket.priority == "high" and ticket.needs_human:
+        return escalate
+    return routes.get(ticket.category, routes["question"])
+
+
+chain = (
+    RunnablePassthrough.assign(ticket=classify)
+    | RunnablePassthrough.assign(answer=RunnableLambda(route))
+)
+```
+
+Quando a função passada ao `RunnableLambda` devolve outra chain, o LangChain executa essa chain com a mesma entrada. O pacote também traz `create_branch_router_chain`, o mesmo roteador escrito com `RunnableBranch`, para comparação.
+
+## Executando
+
+```bash
+python src/main_router.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Prompts especializados** | Cada assunto tem instruções próprias, mais curtas e precisas |
+| **Custo** | Só a rota escolhida é executada |
+| **Regras de negócio** | Casos críticos podem ir para uma rota sem LLM, como o encaminhamento a um atendente |
+| **Evolução** | Uma nova categoria vira uma nova rota, sem mexer nas outras |
 
