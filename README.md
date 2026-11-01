@@ -1,17 +1,95 @@
 # Chain Patterns with LangChain
 
-Este repositório contém implementações de padrões de encadeamento (Chain Patterns) utilizando LangChain para aplicações de Inteligência Artificial Generativa.
+Implementações em Python de padrões para construir aplicações com LLMs usando [LangChain](https://docs.langchain.com/oss/python/langchain) e [LangGraph](https://docs.langchain.com/oss/python/langgraph), do primeiro prompt template a um RAG conversacional com memória.
 
-## Índice
+Cada padrão tem um tutorial passo a passo na trilha **[Engenharia de Prompt](https://mielesantos.github.io/tutoriais/engenharia-de-prompt.html)**, no site [mielesantos.github.io](https://mielesantos.github.io/).
 
-1. [Prompt Template Pattern](#prompt-template-pattern)
-2. [Sequential Chain Pattern](#sequential-chain-pattern)
-3. [Structured Output Pattern](#structured-output-pattern)
-4. [Router Chain Pattern](#router-chain-pattern)
-5. [Parallel Chain Pattern](#parallel-chain-pattern)
-6. [Few-Shot Prompting Pattern](#few-shot-prompting-pattern)
-7. [RAG Pattern](#rag-pattern)
-8. [Memory Pattern](#memory-pattern)
+## Padrões
+
+| # | Padrão | O que mostra | Executar | Tutorial |
+|---|--------|--------------|----------|----------|
+| 1 | [Prompt Template](#prompt-template-pattern) | Prompts reutilizáveis com variáveis e a primeira chain LCEL | `python src/main.py` | [Parte 1](https://mielesantos.github.io/tutoriais/prompt-template-pattern.html) |
+| 2 | [Sequential Chain](#sequential-chain-pattern) | Etapas em sequência: traduzir → resumir → analisar sentimento | `python src/main_sequential.py` | [Parte 2](https://mielesantos.github.io/tutoriais/sequential-chain-pattern.html) |
+| 3 | [Structured Output](#structured-output-pattern) | Resposta como objeto Pydantic validado (triagem de tickets) | `python src/main_structured.py` | [Parte 3](https://mielesantos.github.io/tutoriais/structured-output-pattern.html) |
+| 4 | [Router Chain](#router-chain-pattern) | Classificar e mandar cada pedido para a chain especializada | `python src/main_router.py` | [Parte 4](https://mielesantos.github.io/tutoriais/router-chain-pattern.html) |
+| 5 | [Parallel Chain](#parallel-chain-pattern) | Etapas independentes ao mesmo tempo com `RunnableParallel` | `python src/main_parallel.py` | [Parte 5](https://mielesantos.github.io/tutoriais/parallel-chain-pattern.html) |
+| 6 | [Few-Shot Prompting](#few-shot-prompting-pattern) | Exemplos no prompt, fixos ou escolhidos por semelhança | `python src/main_few_shot.py` | [Parte 6](https://mielesantos.github.io/tutoriais/few-shot-prompting.html) |
+| 7 | [RAG](#rag-pattern) | Respostas a partir de documentos, com fontes e "não encontrei" | `python src/main_rag.py` | [Parte 7](https://mielesantos.github.io/tutoriais/rag.html) |
+| 8 | [Memory](#memory-pattern) | Histórico de conversa com LangGraph e RAG conversacional | `python src/main_memory.py` | [Parte 8](https://mielesantos.github.io/tutoriais/memoria-historico.html) |
+
+## Pré-requisitos
+
+- Python 3.12 ou superior
+- [Poetry](https://python-poetry.org/)
+- Uma chave da API do Gemini ([Google AI Studio](https://aistudio.google.com/apikey))
+
+## Instalação
+
+```bash
+git clone https://github.com/MieleSantos/pattern_chain.git
+cd pattern_chain
+poetry install
+```
+
+## Configuração
+
+Copie o arquivo de exemplo e preencha a sua chave:
+
+```bash
+cp .env.example .env
+```
+
+```env
+GOOGLE_API_KEY=sua_chave_aqui
+```
+
+Todos os exemplos usam o Gemini (`gemini-2.5-flash` para o chat e `gemini-embedding-001` para os embeddings dos padrões 6, 7 e 8). Cada `main_*.py` carrega o `.env` sozinho.
+
+## Como executar
+
+Rode qualquer exemplo a partir da raiz do projeto, dentro do ambiente do Poetry:
+
+```bash
+poetry run python src/main_rag.py
+```
+
+Se preferir, ative o ambiente do Poetry uma vez e rode direto `python src/main_<padrão>.py`.
+
+## Estrutura do Projeto
+
+```
+pattern_chain/
+├── src/
+│   ├── main.py                  # 1. Prompt Template
+│   ├── main_sequential.py       # 2. Sequential Chain
+│   ├── main_structured.py       # 3. Structured Output
+│   ├── main_router.py           # 4. Router Chain
+│   ├── main_parallel.py         # 5. Parallel Chain
+│   ├── main_few_shot.py         # 6. Few-Shot Prompting
+│   ├── main_rag.py              # 7. RAG
+│   ├── main_memory.py           # 8. Memory
+│   ├── prompt_template/         # prompts.py, chain.py
+│   ├── sequential_chain/        # prompts.py, chain.py
+│   ├── structured_output/       # schemas.py, prompts.py, chain.py
+│   ├── router_chain/            # prompts.py, chain.py
+│   ├── parallel_chain/          # prompts.py, chain.py
+│   ├── few_shot/                # examples.py, prompts.py, chain.py
+│   ├── rag/                     # indexing.py, prompts.py, chain.py
+│   └── memory/                  # prompts.py, graph.py
+├── data/
+│   └── nuvem/                   # Base de conhecimento do RAG (cobrança, cancelamento, nota fiscal, integrações)
+├── .env.example
+├── pyproject.toml
+└── README.md
+```
+
+Cada pacote segue a mesma organização: `prompts.py` com os templates, `chain.py` (ou `graph.py`) montando a chain, e um `main_*.py` como ponto de entrada.
+
+## Sobre os exemplos
+
+- Os padrões 3 a 8 usam o mesmo cenário: o suporte da **Nuvem**, uma empresa SaaS fictícia. Os documentos em `data/nuvem/` também são fictícios.
+- As funções que montam as chains aceitam o modelo (e, quando há busca, os embeddings ou o retriever) como parâmetro. Assim dá para trocar de provedor ou testar com modelos falsos, sem chamar a API.
+- A memória (padrão 8) usa a persistência do LangGraph, porque o `RunnableWithMessageHistory` está obsoleto no LangChain 1.x.
 
 ---
 
@@ -49,10 +127,10 @@ messages = chat_prompt.format_messages(style="funny", question="Who is Alan Turi
 O padrão se integra perfeitamente com a composição de cadeias (chains) da LangChain:
 
 ```python
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import init_chat_model
 from langchain_core.output_parsers import StrOutputParser
 
-llm = ChatOpenAI(model="gpt-4")
+llm = init_chat_model(model="gemini-2.5-flash", model_provider="google_genai")
 parser = StrOutputParser()
 
 chain = chat_prompt | llm | parser
@@ -78,72 +156,10 @@ result = chain.invoke(
 3. **Valide inputs**: Garanta que os parâmetros fornecidos são válidos
 4. **Use system messages**: Defina o comportamento do assistente de forma clara
 
-## Estrutura do Projeto
-
-```
-pattern_chain/
-├── src/
-│   ├── main.py                  # Entry point - Prompt Template
-│   ├── main_sequential.py       # Entry point - Sequential Chain
-│   ├── main_structured.py       # Entry point - Structured Output
-│   ├── main_router.py           # Entry point - Router Chain
-│   ├── main_parallel.py         # Entry point - Parallel Chain
-│   ├── main_few_shot.py         # Entry point - Few-Shot Prompting
-│   ├── main_rag.py              # Entry point - RAG
-│   ├── main_memory.py           # Entry point - Memory
-│   ├── prompt_template/         # Prompt Template Pattern
-│   │   ├── __init__.py
-│   │   ├── prompts.py
-│   │   └── chain.py
-│   ├── sequential_chain/       # Sequential Chain Pattern
-│   │   ├── __init__.py
-│   │   ├── prompts.py
-│   │   └── chain.py
-│   ├── router_chain/           # Router Chain Pattern
-│   │   ├── __init__.py
-│   │   ├── prompts.py
-│   │   └── chain.py
-│   ├── parallel_chain/         # Parallel Chain Pattern
-│   │   ├── __init__.py
-│   │   ├── prompts.py
-│   │   └── chain.py
-│   ├── few_shot/               # Few-Shot Prompting Pattern
-│   │   ├── __init__.py
-│   │   ├── examples.py
-│   │   ├── prompts.py
-│   │   └── chain.py
-│   ├── rag/                    # RAG Pattern
-│   │   ├── __init__.py
-│   │   ├── indexing.py
-│   │   ├── prompts.py
-│   │   └── chain.py
-│   ├── memory/                 # Memory Pattern (LangGraph)
-│   │   ├── __init__.py
-│   │   ├── prompts.py
-│   │   └── graph.py
-│   └── structured_output/      # Structured Output Pattern
-│       ├── __init__.py
-│       ├── schemas.py
-│       ├── prompts.py
-│       └── chain.py
-├── data/
-│   └── nuvem/                  # Base de conhecimento usada no RAG
-├── .env.example
-├── pyproject.toml
-└── README.md
-```
-
-## Instalação e Uso
+## Executando
 
 ```bash
-# Instalar dependências
-poetry install
-
-# Executar Prompt Template Pattern
 python src/main.py
-
-# Executar Sequential Chain Pattern
-python src/main_sequential.py
 ```
 
 ---
@@ -189,21 +205,9 @@ def sequential_chain(input_dict):
     return {"translated": translated, "summary": summary}
 ```
 
-## Estrutura do Projeto - Sequential Chain
-
-```
-src/
-├── main_sequential.py        # Entry point
-└── sequential_chain/
-    ├── __init__.py          # Exports públicos
-    ├── prompts.py           # Definição de templates
-    └── chain.py            # Configuração das chains
-```
-
-## Instalação e Uso
+## Executando
 
 ```bash
-# Executar Sequential Chain
 python src/main_sequential.py
 ```
 

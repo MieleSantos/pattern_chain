@@ -1,7 +1,7 @@
 [project]
 name = "pattern-chain"
 version = "0.1.0"
-description = "Prompt Template Pattern implementation with LangChain"
+description = "Padrões para aplicações com LLMs usando LangChain e LangGraph: prompt template, chains, structured output, router, parallel, few-shot, RAG e memória"
 authors = [
     {name = "MieleSantos",email = "mielesnts@gmail.com"}
 ]
