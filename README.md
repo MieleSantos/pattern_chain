@@ -6,6 +6,7 @@ Este repositório contém implementações de padrões de encadeamento (Chain Pa
 
 1. [Prompt Template Pattern](#prompt-template-pattern)
 2. [Sequential Chain Pattern](#sequential-chain-pattern)
+3. [Structured Output Pattern](#structured-output-pattern)
 
 ---
 
@@ -79,12 +80,18 @@ pattern_chain/
 ├── src/
 │   ├── main.py                  # Entry point - Prompt Template
 │   ├── main_sequential.py       # Entry point - Sequential Chain
+│   ├── main_structured.py       # Entry point - Structured Output
 │   ├── prompt_template/         # Prompt Template Pattern
 │   │   ├── __init__.py
 │   │   ├── prompts.py
 │   │   └── chain.py
-│   └── sequential_chain/       # Sequential Chain Pattern
+│   ├── sequential_chain/       # Sequential Chain Pattern
+│   │   ├── __init__.py
+│   │   ├── prompts.py
+│   │   └── chain.py
+│   └── structured_output/      # Structured Output Pattern
 │       ├── __init__.py
+│       ├── schemas.py
 │       ├── prompts.py
 │       └── chain.py
 ├── .env.example
@@ -174,3 +181,75 @@ python src/main_sequential.py
 | **Reutilização** | Cada etapa pode ser reutilizada independentemente |
 | **Debugging** | Possibilidade de inspecionar saída de cada etapa |
 | **Flexibilidade** | Adicione ou remova etapas facilmente |
+
+---
+
+# Structured Output Pattern
+
+O **Structured Output Pattern** faz o modelo devolver um objeto com campos e tipos definidos, em vez de texto livre. Você descreve o formato com um modelo Pydantic e recebe uma instância validada, pronta para usar no código ou numa API.
+
+## Conceito
+
+1. O schema (Pydantic) define os campos, os tipos e os valores permitidos
+2. A descrição de cada campo é enviada ao modelo e funciona como instrução
+3. `with_structured_output` devolve o objeto já validado: não há parser de texto
+
+## Exemplo de Implementação
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field
+
+
+class TicketAnalysis(BaseModel):
+    """Triage of a customer support message."""
+
+    category: Literal["billing", "technical", "cancellation", "question"] = Field(
+        description="Main subject of the message"
+    )
+    priority: Literal["low", "medium", "high"] = Field(
+        description="high when the customer is blocked or losing money"
+    )
+    summary: str = Field(description="One-sentence summary of the request, in Portuguese")
+    needs_human: bool = Field(
+        description="True when the request cannot be solved by an automatic answer"
+    )
+
+
+structured_llm = llm.with_structured_output(TicketAnalysis)
+chain = create_ticket_prompt() | structured_llm
+
+ticket = chain.invoke({"message": "Fui cobrado duas vezes na fatura de outubro"})
+ticket.category   # "billing"
+ticket.priority   # "high"
+```
+
+## Tratando saídas inválidas
+
+Com `include_raw=True`, a chain não lança exceção quando a resposta não segue o schema. Ela devolve um dict com `raw` (a mensagem original), `parsed` (o objeto ou `None`) e `parsing_error`:
+
+```python
+chain = create_structured_chain(include_raw=True)
+result = chain.invoke({"message": "..."})
+
+if result["parsing_error"]:
+    ...  # registrar, tentar de novo ou usar um valor padrão
+else:
+    ticket = result["parsed"]
+```
+
+## Executando
+
+```bash
+python src/main_structured.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Contrato claro** | O formato da resposta é definido por código, não por texto no prompt |
+| **Validação** | Tipos e valores permitidos são verificados pelo Pydantic |
+| **Integração** | O objeto vai direto para regras de negócio, banco de dados ou resposta de API |
+| **Base para roteamento** | Campos como `category` permitem decidir o próximo passo do fluxo |
+
