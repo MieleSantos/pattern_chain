@@ -2,20 +2,20 @@
 
 Implementações em Python de padrões para construir aplicações com LLMs usando [LangChain](https://docs.langchain.com/oss/python/langchain) e [LangGraph](https://docs.langchain.com/oss/python/langgraph), do primeiro prompt template a um RAG conversacional com memória.
 
-Cada padrão tem um tutorial passo a passo na trilha **[Engenharia de Prompt](https://mielesantos.github.io/tutoriais/engenharia-de-prompt.html)**, no site [mielesantos.github.io](https://mielesantos.github.io/).
+Cada padrão tem um tutorial passo a passo na trilha **[Engenharia de Prompt](https://miele.dev.br/tutoriais/engenharia-de-prompt.html)**, no site [miele.dev.br](https://miele.dev.br/).
 
 ## Padrões
 
 | # | Padrão | O que mostra | Executar | Tutorial |
 |---|--------|--------------|----------|----------|
-| 1 | [Prompt Template](#prompt-template-pattern) | Prompts reutilizáveis com variáveis e a primeira chain LCEL | `python src/main.py` | [Parte 1](https://mielesantos.github.io/tutoriais/prompt-template-pattern.html) |
-| 2 | [Sequential Chain](#sequential-chain-pattern) | Etapas em sequência: traduzir → resumir → analisar sentimento | `python src/main_sequential.py` | [Parte 2](https://mielesantos.github.io/tutoriais/sequential-chain-pattern.html) |
-| 3 | [Structured Output](#structured-output-pattern) | Resposta como objeto Pydantic validado (triagem de tickets) | `python src/main_structured.py` | [Parte 3](https://mielesantos.github.io/tutoriais/structured-output-pattern.html) |
-| 4 | [Router Chain](#router-chain-pattern) | Classificar e mandar cada pedido para a chain especializada | `python src/main_router.py` | [Parte 4](https://mielesantos.github.io/tutoriais/router-chain-pattern.html) |
-| 5 | [Parallel Chain](#parallel-chain-pattern) | Etapas independentes ao mesmo tempo com `RunnableParallel` | `python src/main_parallel.py` | [Parte 5](https://mielesantos.github.io/tutoriais/parallel-chain-pattern.html) |
-| 6 | [Few-Shot Prompting](#few-shot-prompting-pattern) | Exemplos no prompt, fixos ou escolhidos por semelhança | `python src/main_few_shot.py` | [Parte 6](https://mielesantos.github.io/tutoriais/few-shot-prompting.html) |
-| 7 | [RAG](#rag-pattern) | Respostas a partir de documentos, com fontes e "não encontrei" | `python src/main_rag.py` | [Parte 7](https://mielesantos.github.io/tutoriais/rag.html) |
-| 8 | [Memory](#memory-pattern) | Histórico de conversa com LangGraph e RAG conversacional | `python src/main_memory.py` | [Parte 8](https://mielesantos.github.io/tutoriais/memoria-historico.html) |
+| 1 | [Prompt Template](#prompt-template-pattern) | Prompts reutilizáveis com variáveis e a primeira chain LCEL | `python src/main.py` | [Parte 1](https://miele.dev.br/tutoriais/prompt-template-pattern.html) |
+| 2 | [Sequential Chain](#sequential-chain-pattern) | Etapas em sequência: traduzir → resumir → analisar sentimento | `python src/main_sequential.py` | [Parte 2](https://miele.dev.br/tutoriais/sequential-chain-pattern.html) |
+| 3 | [Structured Output](#structured-output-pattern) | Resposta como objeto Pydantic validado (triagem de tickets) | `python src/main_structured.py` | [Parte 3](https://miele.dev.br/tutoriais/structured-output-pattern.html) |
+| 4 | [Router Chain](#router-chain-pattern) | Classificar e mandar cada pedido para a chain especializada | `python src/main_router.py` | [Parte 4](https://miele.dev.br/tutoriais/router-chain-pattern.html) |
+| 5 | [Parallel Chain](#parallel-chain-pattern) | Etapas independentes ao mesmo tempo com `RunnableParallel` | `python src/main_parallel.py` | [Parte 5](https://miele.dev.br/tutoriais/parallel-chain-pattern.html) |
+| 6 | [Few-Shot Prompting](#few-shot-prompting-pattern) | Exemplos no prompt, fixos ou escolhidos por semelhança | `python src/main_few_shot.py` | [Parte 6](https://miele.dev.br/tutoriais/few-shot-prompting.html) |
+| 7 | [RAG](#rag-pattern) | Respostas a partir de documentos, com fontes e "não encontrei" | `python src/main_rag.py` | [Parte 7](https://miele.dev.br/tutoriais/rag.html) |
+| 8 | [Memory](#memory-pattern) | Histórico de conversa com LangGraph e RAG conversacional | `python src/main_memory.py` | [Parte 8](https://miele.dev.br/tutoriais/memoria-historico.html) |
 
 ## Pré-requisitos
 
