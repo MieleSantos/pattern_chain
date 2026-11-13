@@ -16,6 +16,9 @@ Cada padrão tem um tutorial passo a passo na trilha **[Engenharia de Prompt](ht
 | 6 | [Few-Shot Prompting](#few-shot-prompting-pattern) | Exemplos no prompt, fixos ou escolhidos por semelhança | `python src/main_few_shot.py` | [Parte 6](https://miele.dev.br/tutoriais/few-shot-prompting.html) |
 | 7 | [RAG](#rag-pattern) | Respostas a partir de documentos, com fontes e "não encontrei" | `python src/main_rag.py` | [Parte 7](https://miele.dev.br/tutoriais/rag.html) |
 | 8 | [Memory](#memory-pattern) | Histórico de conversa com LangGraph e RAG conversacional | `python src/main_memory.py` | [Parte 8](https://miele.dev.br/tutoriais/memoria-historico.html) |
+| 9 | [Chain-of-Thought e Reflection](#chain-of-thought-and-reflection-patterns) | Raciocínio antes da resposta e um ciclo de revisão com limite | `python src/main_cot_reflection.py` | [Parte 9](https://miele.dev.br/tutoriais/chain-of-thought-reflection.html) |
+| 10 | [Map-Reduce](#map-reduce-pattern) | Processar em lotes um texto que não cabe num prompt e consolidar | `python src/main_map_reduce.py` | [Parte 10](https://miele.dev.br/tutoriais/map-reduce.html) |
+| 11 | [Fallback e Retry](#fallback-and-retry-patterns) | Novas tentativas, modelo reserva e mensagem segura quando tudo falha | `python src/main_fallback_retry.py` | [Parte 11](https://miele.dev.br/tutoriais/fallback-retry.html) |
 
 ## Pré-requisitos
 
@@ -68,6 +71,9 @@ pattern_chain/
 │   ├── main_few_shot.py         # 6. Few-Shot Prompting
 │   ├── main_rag.py              # 7. RAG
 │   ├── main_memory.py           # 8. Memory
+│   ├── main_cot_reflection.py   # 9. Chain-of-Thought e Reflection
+│   ├── main_map_reduce.py       # 10. Map-Reduce
+│   ├── main_fallback_retry.py   # 11. Fallback e Retry
 │   ├── prompt_template/         # prompts.py, chain.py
 │   ├── sequential_chain/        # prompts.py, chain.py
 │   ├── structured_output/       # schemas.py, prompts.py, chain.py
@@ -75,9 +81,13 @@ pattern_chain/
 │   ├── parallel_chain/          # prompts.py, chain.py
 │   ├── few_shot/                # examples.py, prompts.py, chain.py
 │   ├── rag/                     # indexing.py, prompts.py, chain.py
-│   └── memory/                  # prompts.py, graph.py
+│   ├── memory/                  # prompts.py, graph.py
+│   ├── cot_reflection/          # schemas.py, prompts.py, chain.py, graph.py
+│   ├── map_reduce/              # schemas.py, prompts.py, chain.py
+│   └── fallback_retry/          # prompts.py, chain.py, simulate.py
 ├── data/
-│   └── nuvem/                   # Base de conhecimento do RAG (cobrança, cancelamento, nota fiscal, integrações)
+│   ├── nuvem/                   # Base de conhecimento dos padrões 7, 8 e 9 (cobrança, cancelamento, nota fiscal, integrações)
+│   └── tickets/                 # Tickets fictícios de uma semana (padrão 10)
 ├── .env.example
 ├── pyproject.toml
 └── README.md
@@ -87,9 +97,12 @@ Cada pacote segue a mesma organização: `prompts.py` com os templates, `chain.p
 
 ## Sobre os exemplos
 
-- Os padrões 3 a 8 usam o mesmo cenário: o suporte da **Nuvem**, uma empresa SaaS fictícia. Os documentos em `data/nuvem/` também são fictícios.
+- Os padrões 3 a 11 usam o mesmo cenário: o suporte da **Nuvem**, uma empresa SaaS fictícia. Os documentos em `data/nuvem/` também são fictícios.
 - As funções que montam as chains aceitam o modelo (e, quando há busca, os embeddings ou o retriever) como parâmetro. Assim dá para trocar de provedor ou testar com modelos falsos, sem chamar a API.
 - A memória (padrão 8) usa a persistência do LangGraph, porque o `RunnableWithMessageHistory` está obsoleto no LangChain 1.x.
+- O padrão 9 não usa embeddings: a base é pequena e vai inteira no prompt.
+- O arquivo de tickets do padrão 10 é pequeno de propósito. O exemplo usa um limite baixo por prompt (`max_chars=800`) para forçar vários lotes.
+- O padrão 11 simula as falhas (`fallback_retry/simulate.py`), para mostrar cada camada sem depender de uma queda real do provedor.
 
 ---
 
@@ -566,3 +579,159 @@ python src/main_memory.py
 | **Custo controlado** | Só as últimas mensagens vão para o prompt |
 | **Pronto para produção** | Troque o `InMemorySaver` por um checkpointer com banco (como Postgres) sem mudar o grafo |
 
+---
+
+# Chain-of-Thought and Reflection Patterns
+
+Dois padrões para melhorar a qualidade da resposta em perguntas que combinam várias regras. O **Chain-of-Thought** faz o modelo raciocinar antes de responder. O **Reflection** faz uma segunda chamada revisar a resposta e pedir correções.
+
+## Conceito
+
+1. **Chain-of-Thought:** o raciocínio é um campo do structured output, antes da resposta. O código registra o raciocínio e mostra só a resposta
+2. **Reflection:** um grafo do LangGraph com três nós: `draft` (rascunho), `review` (revisão contra a documentação) e `revise` (reescrita)
+3. Uma aresta condicional volta de `review` para `revise` enquanto houver problemas
+4. `max_revisions` limita o ciclo. Se o limite acabar com problemas em aberto, o caso vai para uma pessoa
+
+> Modelos com raciocínio embutido, como o `gemini-2.5-flash`, já pensam antes de responder. O raciocínio no structured output continua útil porque fica registrado e pode ser auditado.
+
+## Exemplo de Implementação
+
+```python
+class ReasonedAnswer(BaseModel):
+    reasoning: str = Field(description="Step-by-step reasoning ...")  # vem antes
+    answer: str = Field(description="Final answer to the customer ...")
+
+
+cot_chain = create_cot_prompt() | llm.with_structured_output(ReasonedAnswer)
+```
+
+```python
+def after_review(state: ReflectionState) -> str:
+    if state["critique"].approved or state["revisions"] >= max_revisions:
+        return END
+    return "revise"
+
+
+graph = StateGraph(ReflectionState)
+graph.add_node("draft", draft)
+graph.add_node("review", review)
+graph.add_node("revise", revise)
+graph.add_edge(START, "draft")
+graph.add_edge("draft", "review")
+graph.add_conditional_edges("review", after_review, ["revise", END])
+graph.add_edge("revise", "review")
+app = graph.compile()
+
+state = app.invoke({"question": "Contratei o plano anual há 20 dias. Se eu cancelar, recebo reembolso?"})
+state["answer"], state["revisions"], state["critique"].approved
+```
+
+## Executando
+
+```bash
+python src/main_cot_reflection.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Menos erros em perguntas com várias regras** | O modelo lista os fatos e as regras antes de concluir |
+| **Raciocínio auditável** | O `reasoning` fica no log, separado da resposta do cliente |
+| **Erros pegos antes do cliente** | O revisor confere cada afirmação com a documentação |
+| **Custo previsível** | Com `max_revisions=2`, são no máximo 6 chamadas ao modelo por pergunta |
+
+---
+
+# Map-Reduce Pattern
+
+O **Map-Reduce Pattern** processa um texto que não cabe num prompt só. O texto é dividido em lotes, cada lote é processado separadamente (*map*) e os resultados são combinados numa resposta (*reduce*).
+
+## Conceito
+
+1. **Dividir:** o arquivo vira uma lista de tickets, e os tickets são agrupados em lotes de até `max_chars` caracteres, sem cortar nenhum no meio
+2. **Map:** uma chamada por lote, em paralelo (`batch` com `max_concurrency`). A saída é estruturada: uma nota por ticket, com categoria de uma lista fechada
+3. **Collapse:** se as notas somadas ainda não cabem num prompt, elas são condensadas em grupos, quantas vezes for preciso
+4. **Reduce:** os totais por categoria são contados no código (`Counter`). O modelo só escreve o relatório
+
+## Exemplo de Implementação
+
+```python
+batches = group_texts(tickets, max_chars)
+
+map_chain = create_map_prompt() | llm.with_structured_output(BatchNotes)
+results = map_chain.batch(
+    [{"text": batch} for batch in batches],
+    config={"max_concurrency": 4},
+)
+notes = [note for result in results for note in result.notes]
+
+totals = dict(Counter(note.category for note in notes).most_common())  # conta no código
+report = reduce_chain.invoke({"totals": ..., "notes": ...})            # o modelo escreve
+```
+
+## Executando
+
+```bash
+python src/main_map_reduce.py
+```
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Sem limite de tamanho** | O texto é processado em lotes que cabem no prompt |
+| **Mais rápido** | Os lotes não dependem uns dos outros e rodam em paralelo |
+| **Totais confiáveis** | Contagem feita no código, com categorias de uma lista fechada |
+| **Falha isolada** | Um lote com erro pode ser repetido sem refazer os outros |
+
+---
+
+# Fallback and Retry Patterns
+
+Os padrões de **Retry** e **Fallback** mantêm a chain respondendo quando uma chamada ao modelo falha: limite de requisições, timeout ou provedor fora do ar.
+
+## Conceito
+
+Três camadas, de dentro para fora:
+
+1. **Retry:** tentar de novo no mesmo modelo, com espera crescente entre as tentativas (`with_retry`)
+2. **Fallback:** trocar de modelo quando as tentativas acabam (`with_fallbacks`)
+3. **Mensagem segura:** um texto fixo quando todos os modelos falham, para o cliente nunca receber um erro
+
+> Repita só erros transitórios. Um erro de chave inválida vai falhar em todas as tentativas. Passe em `retry_on` as exceções de limite, timeout e servidor do seu provedor.
+
+## Exemplo de Implementação
+
+```python
+def retrying(model):
+    return model.with_retry(
+        stop_after_attempt=3,
+        retry_if_exception_type=retry_on,
+        wait_exponential_jitter=True,
+    )
+
+
+model = retrying(primary).with_fallbacks([retrying(fallback)])
+chain = create_support_prompt() | model | StrOutputParser()
+chain = chain.with_fallbacks([RunnableLambda(lambda _: SAFE_MESSAGE)])
+```
+
+Saída estruturada inválida também é falha. `create_validated_ticket_chain` repete a chamada do padrão 3 quando o resultado não passa na validação.
+
+## Executando
+
+```bash
+python src/main_fallback_retry.py
+```
+
+O exemplo simula quatro cenários: tudo funcionando, modelo principal falhando duas vezes, principal fora do ar e os dois modelos fora do ar.
+
+## Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Falhas passageiras somem** | Limite de requisições e timeouts se resolvem com uma nova tentativa |
+| **Sem ponto único de falha** | Um segundo modelo assume quando o primeiro não volta |
+| **O cliente nunca vê um erro** | A mensagem segura é texto fixo e não depende de nenhum modelo |
+| **Custo máximo conhecido** | Com 3 tentativas por modelo, são no máximo 6 chamadas por pergunta |
